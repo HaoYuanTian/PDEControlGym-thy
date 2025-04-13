@@ -18,6 +18,7 @@
         "ndarray",
         "Neumann",
         "pdecontrolgym",
+        "pycache",
         "Timestep",
         "timesteps",
         "vairable",

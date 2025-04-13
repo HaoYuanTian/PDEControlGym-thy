@@ -28,3 +28,6 @@ setup(
 # 在这种情况下 import pde_control_gym
 #              import utils           是两个不同的模块。
 # 因为使用pip install -e .（可编辑安装），指向了项目的源码目录，让解释器直接从源码读取模块，而不是依赖于packages= find_packages()中的打包结构。
+# python setup.py bdist_wheel 是为了生成一个稳定版本的 .whl 安装包，必须通过 pip install 安装后才能使用；
+#### 同时会生成build和dist两个文件夹下的内容。
+# 而 pip install -e . 是为了在开发阶段临时挂载源码目录，无需打包也可以直接导入和测试。
