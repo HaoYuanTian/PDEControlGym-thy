@@ -57,7 +57,8 @@ class TransportPDE1D(PDEEnv1D):
         # 初始化父类的数据/结构
         # ↓
         # 返回子类继续初始化自己的参数
-        
+
+        # 将传入的参数赋值给类的实例属性，以便在类的其他方法中使用这些属性。
         self.sensing_noise_func = sensing_noise_func
         self.reset_init_condition_func = reset_init_condition_func 
         self.reset_recirculation_func = reset_recirculation_func
@@ -69,10 +70,12 @@ class TransportPDE1D(PDEEnv1D):
         self.max_control_value = max_control_value
         self.control_sample_rate = control_sample_rate
 	    # Observation space changes depending on sensing
+        # match引入模式匹配语法，根据self.sensing_loc的值执行不同的逻辑分支
         match self.sensing_loc:
             case "full":
+                # spaces.Box 是一个常见的强化学习工具库（如 OpenAI Gym）中的类，用于定义连续值的空间范围。
                 self.observation_space = spaces.Box(
-                    np.full(self.nx, -self.max_state_value, dtype="float32"),
+                    np.full(self.nx, -self.max_state_value, dtype="float32"), # 创建了一个形状为 self.nx 的数组，所有元素填充为 -self.max_state_value. 表示观测空间的下界
                     np.full(self.nx, self.max_state_value, dtype="float32"),
                 )
             case "collocated" | "opposite":
@@ -80,30 +83,37 @@ class TransportPDE1D(PDEEnv1D):
                     np.full(1, -self.max_state_value, dtype="float32"),
                     np.full(1, self.max_state_value, dtype="float32"),
                 )
-            case _:
+            # 如果 self.sensing_loc 的值不属于上述选项，代码会抛出一个 Exception 异常，并提示用户提供有效的 sensing_loc 参数值（即 "full"、"collocated" 或 "opposite"）。
+            # 这种设计确保了参数的有效性，并在输入无效时提供明确的错误信息。
+            case _: 
+                # raise 是一个关键字用于引发异常，Exception: 是 Python 内置的异常类，表示通用的异常类型。在开发过程中检测到不符合预期的情况时，主动抛出错误。
                 raise Exception(
                     "Invalid sensing_loc parameter. Please use 'full', 'collocated', or 'opposite'. See documentation for details."
                 )
 
-        # Setup configurations for control and sensing. Messy, but done once, explicitly before runtime to setup return and control functions
+        # Setup configurations for control and sensing. （杂乱，但只需要设置一次）Messy, but done once, explicitly before runtime to setup return and control functions
         # There is a trick here where noise is a function call itself. Important that noise is a single argument function that returns a single argument
+        # # # # # update 传感器和（控制器？还是输入控制之后的状态）
         match self.control_type:
+            # 控制器类型
             case "Neumann":
-                self.control_update = lambda control, state, dx: control * dx + state
+                self.control_update = lambda control, state, dx: control * dx + state # 定义了一个匿名函数
+                # 判断传感器位置
                 match self.sensing_loc:
-                    # Neumann control u_x(1), full state measurement
+                    # Neumann control u_x(1), full state measurement，默认控制点是在末端
                     case "full":
-                        self.sensing_update = lambda state, dx, noise: noise(state)
+                        self.sensing_update = lambda state, dx, noise: noise(state) # noise是一个函数
                     # Neumann control u_x(1), Dirchilet sensing u(1)
                     case "collocated":
-                        self.sensing_update = lambda state, dx, noise: noise(state[-1])
+                        self.sensing_update = lambda state, dx, noise: noise(state[-1]) # 传感器与控制器在同一位置的话，传感器与观测器状态不同。
                     case "opposite":
+                        # # 传感器与控制器不在同一位置的话，需判断传感器状态
                         match self.sensing_type:
                             # Neumann control u_x(1), Neumann sensing u_x(0)
                             case "Neumann":
                                 self.sensing_update = lambda state, dx, noise: noise(
                                     (state[1] - state[0]) / dx
-                                )
+                                ) # 输入为第一个网格点的导数
                             # Neumann control u_x(1), Dirchilet sensing u(0)
                             case "Dirchilet":
                                 self.sensing_update = lambda state, dx, noise: noise(state[0])
@@ -123,9 +133,10 @@ class TransportPDE1D(PDEEnv1D):
                         self.sensing_update = lambda state, dx, noise: noise(state)
                     # Dichilet control u(1), Neumann sensing u_x(1)
                     case "collocated":
+                        # 两者在同一侧，控制器状态为 Dirchilet ，则传感器状态为 Neumann。
                         self.sensing_update = lambda state, dx, noise: noise(
                             (state[-1] - state[-2]) / dx
-                        )
+                        ) # 输入为最后一个网格点的导数
                     case "opposite":
                         match self.sensing_type:
                             # Dichilet control u(1), Neumann sensing u_x(0)
@@ -146,37 +157,33 @@ class TransportPDE1D(PDEEnv1D):
                 raise Exception(
                     "Invalid control_type parameter. Please use 'Neumann' or 'Dirchilet'. See documentation for details."
                 )
-
+    # 根据控制输入 control 更新 PDE 状态
+    # 模拟 PDE 的演化过程，直到达到控制采样率的时间步长
+    # 返回观测值、奖励、终止状态和其他信息。
+    # 因为在 step 中调用了 self.bate 然而其是在 reset()中定义的，所以要先调用一次reset()
     def step(self, control: float):
         """
         step
 
-        Moves the PDE with control action forward ``control_sample_rate*dt`` steps.
+        Applies the control input and simulates the PDE forward for a duration of ``control_sample_rate`` using time steps of size ``dt`` (i.e., for ``control_sample_rate / dt`` steps).
 
         :param control: The control input to apply to the PDE at the boundary.
         """
         Nx = self.nx
         dx = self.dx
-        dt = self.dt
-        sample_rate = int(round(self.control_sample_rate/dt))
+        dt = self.dt # 从父类继承来的属性，因为调用了父类的初始化，nx 存储在 self 中，可以通过 self.nx 调用。
+        sample_rate = int(round(self.control_sample_rate/dt)) # 计算sample_rate 个数值时间步，PDE才更新一次控制器的动作，在这10步中，控制器的输入control是保持不变的。
         i = 0
         # Actions are applied at a slower rate then the PDE is simulated at
-        while i < sample_rate and self.time_index < self.nt-1:
-            self.time_index += 1
-            # Explicit update of u according to finite difference derivation
-            self.u[self.time_index][-1] = self.normalize(self.control_update(
-                control, self.u[self.time_index][-2], dx), self.max_control_value
-            )
-            self.u[self.time_index][0 : Nx - 1] = self.u[self.time_index - 1][
-                0 : Nx - 1
-            ] + dt * (
-                (
-                    self.u[self.time_index - 1][1:Nx]
-                    - self.u[self.time_index - 1][0 : Nx - 1]
+        # self.nt 为最大时间步数，既要在一个采样周期内，时间也不能超过最大时间步数。
+        while i < sample_rate and self.time_index < self.nt - 1:
+            self.time_index += 1 # 跨函数共享
+            # Explicit update of u according to finite difference derivation （离散的演化步骤：这里采用的有限差分法）
+            # 针对不同的模型需要修改这里 self.u = np.zeros((self.nt, self.nx))  切片操作为[ )
+            self.u[self.time_index][-1] = self.normalize(self.control_update(control, self.u[self.time_index][-2], dx), self.max_control_value) # 边界处是否线性化
+            self.u[self.time_index][0 : Nx - 1] = self.u[self.time_index - 1][0 : Nx - 1] + dt * (
+                (self.u[self.time_index - 1][1:Nx]  - self.u[self.time_index - 1][0 : Nx - 1]) / dx + (self.u[self.time_index - 1][0] * self.beta)[0 : Nx - 1]
                 )
-                / dx
-                + (self.u[self.time_index - 1][0] * self.beta)[0 : Nx - 1]
-            )
             i += 1
         terminate = self.terminate()
         truncate = self.truncate()
@@ -191,7 +198,8 @@ class TransportPDE1D(PDEEnv1D):
             truncate, 
             {},
         )
-
+    
+    # 判断是否已经达到了最大时间步 nt ，如果到了，则返回 True
     def terminate(self):
         """
         terminate
@@ -203,12 +211,14 @@ class TransportPDE1D(PDEEnv1D):
         else:
             return False
 
+    # 判断是否需要强制终止 通过判断状态的L^2
     def truncate(self):
         """
         truncate 
 
         Determines whether to truncate the episode based on the PDE state size and the vairable ``limit_pde_state_size`` given in the PDE environment intialization.
         """
+        # 当布尔变量为True时，下面的范数判断才会生效。
         if (
             self.limit_pde_state_size
             and np.linalg.norm(self.u[self.time_index], 2)  >= self.max_state_value
@@ -219,6 +229,7 @@ class TransportPDE1D(PDEEnv1D):
          
 
     # Resets the system state
+    # 在每个 episode 开始时重置 PDE 的状态； seed 为可选参数，用于设置随机种子，确保环境初始化的可重复性； options 可选参数，用于传递额外的初始化选项。
     def reset(self, seed: Optional[int]=None, options: Optional[dict]=None):
         """
         reset 
@@ -228,6 +239,7 @@ class TransportPDE1D(PDEEnv1D):
 
         Resets the PDE at the start of each environment according to the parameters given during the PDE environment intialization
         """
+        # 如果 try 块中任意一个函数调用失败（例如函数未定义或者执行出错），代码会进去 except 块，抛出一个异常 
         try:
             init_condition = self.reset_init_condition_func(self.nx)
             beta = self.reset_recirculation_func(self.nx)
@@ -235,9 +247,10 @@ class TransportPDE1D(PDEEnv1D):
             raise Exception(
                 "Please pass both an initial condition and a recirculation function in the parameters dictionary. See documentation for more details"
                 )
+        # 正常执行
         self.u = np.zeros(
             (self.nt, self.nx), dtype=np.float32
-        )
+            )
         self.u[0] = init_condition
         self.time_index = 0
         self.beta = beta
@@ -249,3 +262,4 @@ class TransportPDE1D(PDEEnv1D):
             ),
             {},
         )
+        # {} 用于占位

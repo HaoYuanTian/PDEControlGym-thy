@@ -52,7 +52,7 @@ class PDEEnv1D(gym.Env):
         # Holds entire system state. Modified with ghost points for parabolic PDE
         self.u = np.zeros((self.nt, self.nx)) 
 
-        self.time_index = 0
+        self.time_index = 0 # 时间索引
 
         # Setup reward function.
         self.reward_class = reward_class
