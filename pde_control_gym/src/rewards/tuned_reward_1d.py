@@ -34,7 +34,13 @@ class TunedReward1D(BaseReward):
         """
 
         if terminate and np.linalg.norm(uVec[time_index]) < 20:
+            # 正常终止的基准奖励（状态要稳定） - 惩罚项（1）取决于状态向量最后一列的绝对值之后 - 惩罚项（2）取决于当前状态的 L^2 范数
             return (self.terminate_reward - np.sum(abs(uVec[:, -1]))/1000 - np.linalg.norm(uVec[time_index]))
+        
         if truncate:
+            # 提前截断的惩罚：取决于剩余的时间步数
             return self.truncate_penalty*(self.nt-time_index)
-        return np.linalg.norm(uVec[time_index-100])-np.linalg.norm(uVec[time_index])
+        
+        # 正常情况：即没有符合条件的终止，也没有截断
+        # 当前时间步100步之前的状态范数 - 当前时间步的范数
+        return np.linalg.norm(uVec[time_index-100]) - np.linalg.norm(uVec[time_index])

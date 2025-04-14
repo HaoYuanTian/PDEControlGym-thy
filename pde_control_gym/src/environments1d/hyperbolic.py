@@ -185,8 +185,11 @@ class TransportPDE1D(PDEEnv1D):
                 (self.u[self.time_index - 1][1:Nx]  - self.u[self.time_index - 1][0 : Nx - 1]) / dx + (self.u[self.time_index - 1][0] * self.beta)[0 : Nx - 1]
                 )
             i += 1
+        
+        # 检查中断条件
         terminate = self.terminate()
         truncate = self.truncate()
+
         return (
             self.sensing_update(
                 self.u[self.time_index],
@@ -222,7 +225,7 @@ class TransportPDE1D(PDEEnv1D):
         if (
             self.limit_pde_state_size
             and np.linalg.norm(self.u[self.time_index], 2)  >= self.max_state_value
-        ):
+            ):
             return True
         else:
             return False
