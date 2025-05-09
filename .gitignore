@@ -5,3 +5,7 @@
 *~          # Emacs 临时备份文件
 *.swp       # Vim 编辑中产生的 swap 文件
 *.swo       # Vim 的另一个 swap 文件后缀
+
+# 忽略训练日志和模型输出
+logsPPO/
+tb/
