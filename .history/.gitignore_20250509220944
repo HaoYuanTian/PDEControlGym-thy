@@ -1,0 +1,7 @@
+# 忽略所有子目录下的 Python 缓存文件夹（自动生成）
+**/__pycache__/
+
+# 忽略编辑器的临时文件（Emacs、Vim）
+*~          # Emacs 临时备份文件
+*.swp       # Vim 编辑中产生的 swap 文件
+*.swo       # Vim 的另一个 swap 文件后缀
