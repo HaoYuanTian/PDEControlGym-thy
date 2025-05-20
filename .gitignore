@@ -7,4 +7,7 @@
 *.swo       # Vim 的另一个 swap 文件后缀
 
 # 忽略训练权重
-logsPPO/
+best_models/*
+eval_logs/*
+logs/*
+tb/*
