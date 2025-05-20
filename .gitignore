@@ -11,3 +11,6 @@ examples/transportPDE/best_models/*
 examples/transportPDE/eval_logs/*
 examples/transportPDE/logs/*
 examples/transportPDE/tb/*
+
+# 
+.history/
