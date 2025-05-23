@@ -12,5 +12,16 @@ examples/transportPDE/eval_logs/*
 examples/transportPDE/logs/*
 examples/transportPDE/tb/*
 
-# 
+# 忽略vscode的历史文件
 .history/
+
+# .gitignore 使用方法
+# 首先修改.gitignore 文件 （无论增加还是修改）
+# 如果删除已经忽略的文件   这个必须要！！！！
+# git rm -r --cached _(文件名)_
+# 如果添加忽略的文件夹
+# git add -f _(文件名)_
+# 提交更新
+# git commit -m "备注的内容"
+# 推送同步
+# git push 
